@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product — TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <a href="/home.html" class="brand">TradeLoop</a>
+      <nav>
+        <a href="/home.html">Home</a>
+        <a href="/sell.html">Sell</a>
+        <a href="/profile.html">Profile</a>
+        <span class="hi" id="who"></span>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1 id="name">…</h1>
+    <p class="small" id="meta"></p>
+    <p><strong id="price"></strong></p>
+    <pre class="desc" id="desc"></pre>
+    <div id="actions"></div>
+    <p class="small"><a id="more" href="#">More in category</a></p>
+    <p id="err" class="err" hidden></p>
+  </main>
+  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
+  <script src="/js/require-login.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      const err = document.getElementById("err");
+      if (!id) {
+        err.textContent = "Missing ?id=";
+        err.hidden = false;
+        return;
+      }
+      let me;
+      try {
+        me = await apiGet("/api/me");
+        document.getElementById("who").textContent = me.user.username;
+      } catch (e) {
+        return;
+      }
+
+      try {
+        const { product: p } = await apiGet("/api/products/" + encodeURIComponent(id));
+        document.getElementById("name").textContent = p.name;
+        document.getElementById("meta").textContent =
+          p.category + " · Seller: " + p.seller_username;
+        document.getElementById("price").textContent = "₹" + p.price.toFixed(2);
+        document.getElementById("desc").textContent = p.description || "—";
+        document.getElementById("more").href =
+          "/browse.html?category=" + encodeURIComponent(p.category);
+        document.getElementById("more").textContent = "More in " + p.category;
+
+        const actions = document.getElementById("actions");
+        actions.innerHTML = "";
+        if (p.is_available) {
+          if (p.seller_id === me.user.id) {
+            actions.innerHTML = "<p class=\"small\">Your listing.</p>";
+          } else {
+            const form = document.createElement("form");
+            const btn = document.createElement("button");
+            btn.type = "submit";
+            btn.textContent = "Buy";
+            form.appendChild(btn);
+            form.addEventListener("submit", async function (ev) {
+              ev.preventDefault();
+              err.hidden = true;
+              try {
+                await apiPost("/api/products/" + id + "/buy", {});
+                window.location.href = "/profile.html";
+              } catch (ex) {
+                err.textContent = ex.message || "Error";
+                err.hidden = false;
+              }
+            });
+            actions.appendChild(form);
+          }
+        } else {
+          actions.innerHTML =
+            "<p class=\"small\">Sold" +
+            (p.buyer_username ? " to " + p.buyer_username : "") +
+            ".</p>";
+        }
+      } catch (e) {
+        err.textContent = e.message || "Not found";
+        err.hidden = false;
+      }
+
+      document.getElementById("logout").addEventListener("click", async function (e) {
+        e.preventDefault();
+        await apiPost("/api/logout", {});
+        window.location.href = "/login.html";
+      });
+    })();
+  </script>
+</body>
+</html>

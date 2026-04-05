@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sell — TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <a href="/home.html" class="brand">TradeLoop</a>
+      <nav>
+        <a href="/home.html">Home</a>
+        <a href="/sell.html">Sell</a>
+        <a href="/profile.html">Profile</a>
+        <span class="hi" id="who"></span>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1>Sell an item</h1>
+    <p id="err" class="err" hidden></p>
+    <form id="form" class="form">
+      <label>Name <input name="name" required maxlength="200"></label>
+      <label>Category
+        <select name="category" id="category" required>
+          <option value="" selected disabled>—</option>
+        </select>
+      </label>
+      <label>Price (₹) <input name="price" type="number" step="0.01" min="0.01" required></label>
+      <label>Description <textarea name="description" rows="4"></textarea></label>
+      <button type="submit">List item</button>
+    </form>
+  </main>
+  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
+  <script src="/js/require-login.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      const err = document.getElementById("err");
+      try {
+        const me = await apiGet("/api/me");
+        document.getElementById("who").textContent = me.user.username;
+        const { categories } = await apiGet("/api/categories");
+        const sel = document.getElementById("category");
+        categories.forEach(function (c) {
+          const o = document.createElement("option");
+          o.value = c;
+          o.textContent = c;
+          sel.appendChild(o);
+        });
+      } catch (e) {
+        return;
+      }
+
+      document.getElementById("form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        err.hidden = true;
+        const fd = new FormData(e.target);
+        try {
+          const data = await apiPost("/api/products", {
+            name: fd.get("name"),
+            category: fd.get("category"),
+            price: Number(fd.get("price")),
+            description: fd.get("description") || "",
+          });
+          window.location.href = "/product.html?id=" + data.id;
+        } catch (ex) {
+          err.textContent = ex.message || "Error";
+          err.hidden = false;
+        }
+      });
+
+      document.getElementById("logout").addEventListener("click", async function (e) {
+        e.preventDefault();
+        await apiPost("/api/logout", {});
+        window.location.href = "/login.html";
+      });
+    })();
+  </script>
+</body>
+</html>

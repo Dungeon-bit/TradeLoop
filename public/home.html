@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home — TradeLoop</title>
+
+  <!-- Bootstrap -->
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Your CSS -->
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+<!-- ✅ NAVBAR (YOUR STYLE + FIXED) -->
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container px-4 px-lg-5">
+
+```
+<a class="navbar-brand d-flex align-items-center" href="/">
+  <img src="./css/tradeloop-64px.svg" width="40" class="me-2">
+  TradeLoop
+</a>
+
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+  <span class="navbar-toggler-icon"></span>
+</button>
+
+<div class="collapse navbar-collapse" id="nav">
+  <ul class="navbar-nav ms-auto align-items-center">
+    <li class="nav-item"><a class="nav-link active" href="/">Home</a></li>
+    <li class="nav-item"><a class="nav-link" href="/sell.html">Sell</a></li>
+    <li class="nav-item"><a class="nav-link" href="/profile.html">Profile</a></li>
+    <li class="nav-item"><span id="who" class="nav-link text-warning"></span></li>
+  </ul>
+</div>
+```
+
+  </div>
+</nav>
+
+<!-- ✅ HERO (FROM TEMPLATE) -->
+
+<header class="bg-dark py-5">
+  <div class="container text-center text-white">
+    <h1 class="display-4 fw-bolder">Shop in style</h1>
+    <p class="lead text-white-50">TradeLoop Marketplace</p>
+  </div>
+</header>
+
+<!-- ✅ PRODUCTS SECTION (TEMPLATE DESIGN + YOUR DATA) -->
+
+<section class="py-5">
+  <div class="container px-4 px-lg-5 mt-5">
+
+```
+<!-- Categories -->
+<h3>Categories</h3>
+<ul id="cats" class="mb-4"></ul>
+
+<!-- Error -->
+<p id="err" class="text-danger" hidden></p>
+
+<!-- Products -->
+<div id="list" class="row gx-4 gx-lg-5 row-cols-2 row-cols-md-3 row-cols-xl-4 justify-content-center"></div>
+```
+
+  </div>
+</section>
+
+<!-- FOOTER -->
+
+<footer class="py-5 bg-dark">
+  <div class="container">
+    <p class="m-0 text-center text-white">No online payments — arrange offline (SRS).</p>
+  </div>
+</footer>
+
+<!-- SCRIPTS -->
+
+<script src="/js/require-login.js"></script>
+
+<script src="/js/api.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+(async function () {
+  const err = document.getElementById("err");
+
+  try {
+    const me = await apiGet("/api/me");
+
+    // username fix
+    document.getElementById("who").textContent = me.user.username;
+
+    // categories
+    const { categories } = await apiGet("/api/categories");
+    const catUl = document.getElementById("cats");
+
+    categories.forEach(function (c) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "/browse.html?category=" + encodeURIComponent(c);
+      a.textContent = c;
+      li.appendChild(a);
+      catUl.appendChild(li);
+    });
+
+    // products
+    const { products } = await apiGet("/api/products/recent");
+    const list = document.getElementById("list");
+
+    if (!products.length) {
+      list.innerHTML = "<p>No items available.</p>";
+      return;
+    }
+
+    products.forEach(function (p) {
+      const div = document.createElement("div");
+      div.className = "col mb-5";
+
+      div.innerHTML = `
+        <div class="card h-100">
+          <img class="card-img-top" src="https://dummyimage.com/450x300/dee2e6/6c757d.jpg" alt="">
+          <div class="card-body p-4">
+            <div class="text-center">
+              <h5 class="fw-bolder">${p.name}</h5>
+              <p class="text-muted">${p.category}</p>
+              ₹${p.price.toFixed(2)}
+            </div>
+          </div>
+          <div class="card-footer p-4 pt-0 border-top-0 bg-transparent text-center">
+            <a href="/product.html?id=${p.id}" class="btn btn-outline-dark mt-auto">View</a>
+          </div>
+        </div>
+      `;
+
+      list.appendChild(div);
+    });
+
+  } catch (e) {
+    err.textContent = e.message || "Error loading data";
+    err.hidden = false;
+  }
+})();
+</script>
+
+</body>
+</html>

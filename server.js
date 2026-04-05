@@ -1,0 +1,277 @@
+/**
+ * TradeLoop — Express + MySQL API + static HTML/CSS/JS (SRS prototype).
+ */
+require("dotenv").config();
+const path = require("path");
+const express = require("express");
+const session = require("express-session");
+const mysql = require("mysql2/promise");
+const bcrypt = require("bcryptjs");
+
+const PORT = Number(process.env.PORT) || 3000;
+const CATEGORIES = ["Books", "Electronics", "Other"];
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD ?? "",
+  database: process.env.DB_NAME || "tradeloop",
+  waitForConnections: true,
+  connectionLimit: 10,
+});
+
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-only-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { httpOnly: true, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 },
+  })
+);
+app.use(express.static(path.join(__dirname, "public")));
+
+function requireAuth(req, res, next) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not logged in" });
+  }
+  next();
+}
+
+// --- Auth ---
+
+app.post("/api/register", async (req, res) => {
+  const username = String(req.body.username || "").trim();
+  const password = String(req.body.password || "");
+  if (username.length < 2) {
+    return res.status(400).json({ error: "Username too short" });
+  }
+  if (password.length < 4) {
+    return res.status(400).json({ error: "Password too short" });
+  }
+  try {
+    const hash = await bcrypt.hash(password, 10);
+    const [r] = await pool.execute(
+      "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+      [username, hash]
+    );
+    req.session.userId = r.insertId;
+    req.session.username = username;
+    return res.json({ ok: true, user: { id: r.insertId, username } });
+  } catch (e) {
+    if (e.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ error: "Username taken" });
+    }
+    console.error(e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  const username = String(req.body.username || "").trim();
+  const password = String(req.body.password || "");
+  const [rows] = await pool.execute(
+    "SELECT id, username, password_hash FROM users WHERE username = ?",
+    [username]
+  );
+  const user = rows[0];
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    return res.status(401).json({ error: "Invalid login" });
+  }
+  req.session.userId = user.id;
+  req.session.username = user.username;
+  return res.json({ ok: true, user: { id: user.id, username: user.username } });
+});
+
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ ok: true });
+  });
+});
+
+app.get("/api/me", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not logged in" });
+  }
+  res.json({ user: { id: req.session.userId, username: req.session.username } });
+});
+
+// --- Products (SRS: browse, sell, buy) ---
+
+app.get("/api/products/recent", requireAuth, async (req, res) => {
+  const [rows] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, p.description, p.is_available,
+            u.username AS seller_username
+     FROM products p
+     JOIN users u ON u.id = p.seller_id
+     WHERE p.is_available = 1
+     ORDER BY p.created_at DESC
+     LIMIT 20`
+  );
+  res.json({ products: rows.map(normalizeProduct) });
+});
+
+app.get("/api/products/by-category/:category", requireAuth, async (req, res) => {
+  const category = req.params.category;
+  if (!CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: "Unknown category" });
+  }
+  const [rows] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, p.description, p.is_available,
+            u.username AS seller_username
+     FROM products p
+     JOIN users u ON u.id = p.seller_id
+     WHERE p.category = ? AND p.is_available = 1
+     ORDER BY p.created_at DESC`,
+    [category]
+  );
+  res.json({ category, products: rows.map(normalizeProduct) });
+});
+
+app.get("/api/products/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const [rows] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, p.description, p.seller_id, p.buyer_id,
+            p.is_available, p.created_at, p.sold_at,
+            s.username AS seller_username,
+            b.username AS buyer_username
+     FROM products p
+     JOIN users s ON s.id = p.seller_id
+     LEFT JOIN users b ON b.id = p.buyer_id
+     WHERE p.id = ?`,
+    [id]
+  );
+  const row = rows[0];
+  if (!row) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.json({ product: normalizeProductDetail(row) });
+});
+
+app.post("/api/products", requireAuth, async (req, res) => {
+  const name = String(req.body.name || "").trim();
+  const category = String(req.body.category || "");
+  const description = String(req.body.description || "").trim();
+  const price = Number(req.body.price);
+  if (!name) {
+    return res.status(400).json({ error: "Name required" });
+  }
+  if (!CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: "Invalid category" });
+  }
+  if (!Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ error: "Invalid price" });
+  }
+  const [r] = await pool.execute(
+    `INSERT INTO products (name, category, price, description, seller_id, is_available)
+     VALUES (?, ?, ?, ?, ?, 1)`,
+    [name.slice(0, 200), category, price.toFixed(2), description, req.session.userId]
+  );
+  res.json({ ok: true, id: r.insertId });
+});
+
+app.post("/api/products/:id/buy", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute(
+      "SELECT id, seller_id, is_available FROM products WHERE id = ? FOR UPDATE",
+      [id]
+    );
+    const p = rows[0];
+    if (!p) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (!p.is_available) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Already sold" });
+    }
+    if (p.seller_id === req.session.userId) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Cannot buy your own item" });
+    }
+    await conn.execute(
+      `UPDATE products SET is_available = 0, buyer_id = ?, sold_at = UTC_TIMESTAMP() WHERE id = ?`,
+      [req.session.userId, id]
+    );
+    await conn.commit();
+    res.json({ ok: true });
+  } catch (e) {
+    await conn.rollback();
+    console.error(e);
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    conn.release();
+  }
+});
+
+// --- Profile (SRS: listed + purchased) ---
+
+app.get("/api/profile", requireAuth, async (req, res) => {
+  const uid = req.session.userId;
+  const [listed] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, p.is_available
+     FROM products p WHERE p.seller_id = ?
+     ORDER BY p.created_at DESC`,
+    [uid]
+  );
+  const [bought] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, u.username AS seller_username
+     FROM products p
+     JOIN users u ON u.id = p.seller_id
+     WHERE p.buyer_id = ?
+     ORDER BY p.id DESC`,
+    [uid]
+  );
+  res.json({
+    user: { id: uid, username: req.session.username },
+    listed,
+    bought,
+  });
+});
+
+app.get("/api/categories", (req, res) => {
+  res.json({ categories: CATEGORIES });
+});
+
+function normalizeProduct(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    price: Number(row.price),
+    description: row.description,
+    is_available: Boolean(row.is_available),
+    seller_username: row.seller_username,
+  };
+}
+
+function normalizeProductDetail(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    price: Number(row.price),
+    description: row.description,
+    seller_id: row.seller_id,
+    buyer_id: row.buyer_id,
+    is_available: Boolean(row.is_available),
+    seller_username: row.seller_username,
+    buyer_username: row.buyer_username || null,
+  };
+}
+
+app.listen(PORT, () => {
+  console.log(`TradeLoop http://localhost:${PORT}`);
+});

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browse — TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <a href="/home.html" class="brand">TradeLoop</a>
+      <nav>
+        <a href="/home.html">Home</a>
+        <a href="/sell.html">Sell</a>
+        <a href="/profile.html">Profile</a>
+        <span class="hi" id="who"></span>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1 id="title">Browse</h1>
+    <p class="small"><a href="/home.html">← Home</a></p>
+    <p id="err" class="err" hidden></p>
+    <ul class="items" id="list"></ul>
+  </main>
+  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
+  <script src="/js/require-login.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    (async function () {
+      const params = new URLSearchParams(window.location.search);
+      const category = params.get("category");
+      const err = document.getElementById("err");
+      if (!category) {
+        err.textContent = "Missing ?category=";
+        err.hidden = false;
+        return;
+      }
+      try {
+        const me = await apiGet("/api/me");
+        document.getElementById("who").textContent = me.user.username;
+        document.getElementById("title").textContent = category;
+
+        const { products } = await apiGet("/api/products/by-category/" + encodeURIComponent(category));
+        const list = document.getElementById("list");
+        if (!products.length) {
+          list.innerHTML = "<li class=\"small\">No items in this category.</li>";
+          return;
+        }
+        products.forEach(function (p) {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = "/product.html?id=" + p.id;
+          a.textContent = p.name;
+          li.appendChild(a);
+          li.appendChild(
+            document.createTextNode(" — ₹" + p.price.toFixed(2) + " — " + p.seller_username)
+          );
+          list.appendChild(li);
+        });
+      } catch (e) {
+        err.textContent = e.message || "Error";
+        err.hidden = false;
+      }
+
+      document.getElementById("logout").addEventListener("click", async function (e) {
+        e.preventDefault();
+        await apiPost("/api/logout", {});
+        window.location.href = "/login.html";
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Register — TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <a href="/" class="brand">TradeLoop</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1>Register</h1>
+    <p id="err" class="err" hidden></p>
+    <form id="form" class="form">
+      <label>Username <input name="username" required minlength="2" autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required minlength="4" autocomplete="new-password"></label>
+      <button type="submit">Create account</button>
+    </form>
+    <p class="small"><a href="/login.html">Log in</a></p>
+  </main>
+  <footer class="wrap small">Prototype — Express + MySQL (SRS).</footer>
+  <script src="/js/api.js"></script>
+  <script>
+    fetch("/api/me", { credentials: "same-origin" }).then(function (r) {
+      if (r.ok) window.location.href = "/home.html";
+    });
+    document.getElementById("form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const err = document.getElementById("err");
+      err.hidden = true;
+      const fd = new FormData(e.target);
+      try {
+        await apiPost("/api/register", {
+          username: fd.get("username"),
+          password: fd.get("password"),
+        });
+        window.location.href = "/home.html";
+      } catch (ex) {
+        err.textContent = ex.message || "Could not register";
+        err.hidden = false;
+      }
+    });
+  </script>
+</body>
+</html>

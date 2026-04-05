@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TradeLoop</title>
+  <script>
+    fetch("/api/me", { credentials: "same-origin" }).then(function (r) {
+      window.location.href = r.ok ? "/home.html" : "/login.html";
+    });
+  </script>
+</head>
+<body>
+  <p>Loading…</p>
+</body>
+</html>
