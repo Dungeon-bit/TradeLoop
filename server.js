@@ -372,6 +372,9 @@ function normalizeProductDetail(row) {
     lng: row.lng,
   };
 }
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server running on", PORT);
