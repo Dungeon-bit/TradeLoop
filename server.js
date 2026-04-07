@@ -7,9 +7,16 @@ const express = require("express");
 const session = require("express-session");
 const mysql = require("mysql2/promise");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
+const fs = require("fs");
+
+if (!fs.existsSync(path.join(__dirname, "public", "uploads"))) {
+  fs.mkdirSync(path.join(__dirname, "public", "uploads"), { recursive: true });
+}
+const upload = multer({ dest: path.join(__dirname, "public", "uploads") });
 
 const PORT = Number(process.env.PORT) || 3000;
-const CATEGORIES = ["Books", "Electronics", "Other"];
+const CATEGORIES = ["Books", "Electronics", "Essentials", "Others"];
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "127.0.0.1",
@@ -101,9 +108,37 @@ app.get("/api/me", (req, res) => {
 
 // --- Products (SRS: browse, sell, buy) ---
 
+app.get("/api/products/by-category/:category", async (req, res) => {
+  const category = req.params.category;
+  const [products] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.description, p.price, p.image_url, p.created_at, p.seller_id, u.username AS seller_username
+     FROM products p
+     JOIN users u ON p.seller_id = u.id
+     WHERE p.is_available = 1 AND p.category = ?
+     ORDER BY p.created_at DESC`,
+    [category]
+  );
+  res.json({ products: products.map(normalizeProduct) });
+});
+
+app.get("/api/products/search", async (req, res) => {
+  const q = req.query.q || "";
+  const likeQ = `%${q}%`;
+  const [products] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.description, p.price, p.image_url, p.created_at, p.seller_id, u.username AS seller_username
+     FROM products p
+     JOIN users u ON p.seller_id = u.id
+     WHERE p.is_available = 1 AND p.name LIKE ?
+     ORDER BY p.created_at DESC`,
+    [likeQ]
+  );
+  res.json({ products: products.map(normalizeProduct) });
+});
+
 app.get("/api/products/recent", requireAuth, async (req, res) => {
   const [rows] = await pool.execute(
     `SELECT p.id, p.name, p.category, p.price, p.description, p.is_available,
+            p.image_url, p.phone_number, p.address, p.lat, p.lng,
             u.username AS seller_username
      FROM products p
      JOIN users u ON u.id = p.seller_id
@@ -121,6 +156,7 @@ app.get("/api/products/by-category/:category", requireAuth, async (req, res) => 
   }
   const [rows] = await pool.execute(
     `SELECT p.id, p.name, p.category, p.price, p.description, p.is_available,
+            p.image_url, p.phone_number, p.address, p.lat, p.lng,
             u.username AS seller_username
      FROM products p
      JOIN users u ON u.id = p.seller_id
@@ -139,6 +175,7 @@ app.get("/api/products/:id", requireAuth, async (req, res) => {
   const [rows] = await pool.execute(
     `SELECT p.id, p.name, p.category, p.price, p.description, p.seller_id, p.buyer_id,
             p.is_available, p.created_at, p.sold_at,
+            p.image_url, p.phone_number, p.address, p.lat, p.lng,
             s.username AS seller_username,
             b.username AS buyer_username
      FROM products p
@@ -154,11 +191,21 @@ app.get("/api/products/:id", requireAuth, async (req, res) => {
   res.json({ product: normalizeProductDetail(row) });
 });
 
-app.post("/api/products", requireAuth, async (req, res) => {
+app.post("/api/products", requireAuth, upload.single("image"), async (req, res) => {
   const name = String(req.body.name || "").trim();
   const category = String(req.body.category || "");
   const description = String(req.body.description || "").trim();
   const price = Number(req.body.price);
+  const phone = String(req.body.phone || "").trim() || null;
+  const address = String(req.body.address || "").trim() || null;
+  const lat = req.body.lat ? Number(req.body.lat) : null;
+  const lng = req.body.lng ? Number(req.body.lng) : null;
+
+  let image_url = null;
+  if (req.file) {
+    image_url = "/uploads/" + req.file.filename;
+  }
+
   if (!name) {
     return res.status(400).json({ error: "Name required" });
   }
@@ -169,9 +216,9 @@ app.post("/api/products", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid price" });
   }
   const [r] = await pool.execute(
-    `INSERT INTO products (name, category, price, description, seller_id, is_available)
-     VALUES (?, ?, ?, ?, ?, 1)`,
-    [name.slice(0, 200), category, price.toFixed(2), description, req.session.userId]
+    `INSERT INTO products (name, category, price, description, seller_id, is_available, image_url, phone_number, address, lat, lng)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+    [name.slice(0, 200), category, price.toFixed(2), description, req.session.userId, image_url, phone, address, lat, lng]
   );
   res.json({ ok: true, id: r.insertId });
 });
@@ -195,14 +242,15 @@ app.post("/api/products/:id/buy", requireAuth, async (req, res) => {
     }
     if (!p.is_available) {
       await conn.rollback();
-      return res.status(400).json({ error: "Already sold" });
+      return res.status(400).json({ error: "Already pending or sold" });
     }
     if (p.seller_id === req.session.userId) {
       await conn.rollback();
       return res.status(400).json({ error: "Cannot buy your own item" });
     }
+    // Set is_available = 0 and buyer_id, but leave sold_at NULL to signify "Pending" 
     await conn.execute(
-      `UPDATE products SET is_available = 0, buyer_id = ?, sold_at = UTC_TIMESTAMP() WHERE id = ?`,
+      `UPDATE products SET is_available = 0, buyer_id = ? WHERE id = ?`,
       [req.session.userId, id]
     );
     await conn.commit();
@@ -216,30 +264,63 @@ app.post("/api/products/:id/buy", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/products/:id/complete", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "Bad id" });
+  }
+  const [rows] = await pool.execute(
+    "SELECT seller_id, is_available, sold_at FROM products WHERE id = ?",
+    [id]
+  );
+  if (!rows[0] || rows[0].seller_id !== req.session.userId) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+  if (rows[0].sold_at !== null) {
+    return res.status(400).json({ error: "Already completed" });
+  }
+  await pool.execute(
+    "UPDATE products SET sold_at = UTC_TIMESTAMP() WHERE id = ?",
+    [id]
+  );
+  res.json({ ok: true });
+});
+
+
 // --- Profile (SRS: listed + purchased) ---
 
 app.get("/api/profile", requireAuth, async (req, res) => {
   const uid = req.session.userId;
   const [listed] = await pool.execute(
     `SELECT p.id, p.name, p.category, p.price, p.is_available
-     FROM products p WHERE p.seller_id = ?
+     FROM products p WHERE p.seller_id = ? AND p.is_available = 1
+     ORDER BY p.created_at DESC`,
+    [uid]
+  );
+  const [pending] = await pool.execute(
+    `SELECT p.id, p.name, p.category, p.price, u.username AS buyer_username
+     FROM products p
+     LEFT JOIN users u ON u.id = p.buyer_id
+     WHERE p.seller_id = ? AND p.is_available = 0 AND p.sold_at IS NULL
      ORDER BY p.created_at DESC`,
     [uid]
   );
   const [bought] = await pool.execute(
-    `SELECT p.id, p.name, p.category, p.price, u.username AS seller_username
+    `SELECT p.id, p.name, p.category, p.price, u.username AS seller_username, p.sold_at
      FROM products p
      JOIN users u ON u.id = p.seller_id
-     WHERE p.buyer_id = ?
+     WHERE p.buyer_id = ? AND p.is_available = 0 
      ORDER BY p.id DESC`,
     [uid]
   );
   res.json({
     user: { id: uid, username: req.session.username },
-    listed,
-    bought,
+    listed: listed.map(normalizeProduct),
+    pending: pending.map(row => ({ ...normalizeProduct(row), buyer_username: row.buyer_username })),
+    bought: bought.map(row => ({ ...normalizeProduct(row), sold_at: row.sold_at })),
   });
 });
+
 
 app.get("/api/categories", (req, res) => {
   res.json({ categories: CATEGORIES });
@@ -254,6 +335,11 @@ function normalizeProduct(row) {
     description: row.description,
     is_available: Boolean(row.is_available),
     seller_username: row.seller_username,
+    image_url: row.image_url,
+    phone_number: row.phone_number,
+    address: row.address,
+    lat: row.lat,
+    lng: row.lng,
   };
 }
 
@@ -269,6 +355,11 @@ function normalizeProductDetail(row) {
     is_available: Boolean(row.is_available),
     seller_username: row.seller_username,
     buyer_username: row.buyer_username || null,
+    image_url: row.image_url,
+    phone_number: row.phone_number,
+    address: row.address,
+    lat: row.lat,
+    lng: row.lng,
   };
 }
 

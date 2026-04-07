@@ -7,79 +7,169 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
-    <div class="wrap bar">
-      <a href="/home.html" class="brand">TradeLoop</a>
+<header>
+  <div class="wrap navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a class="brand" href="/" style="display: flex; align-items: center;"><img src="/css/tradeloop-64px.svg" alt="TradeLoop" style="height: 32px;"></a>
       <nav>
-        <a href="/home.html">Home</a>
+        <a href="/home.html">Shop</a>
         <a href="/sell.html">Sell</a>
-        <a href="/profile.html">Profile</a>
-        <span class="hi" id="who"></span>
-        <a href="#" id="logout">Log out</a>
+        <a href="/help.html">Help</a>
       </nav>
     </div>
-  </header>
-  <main class="wrap">
-    <h1 id="uname">…</h1>
-    <h2>Items you listed</h2>
-    <p id="err" class="err" hidden></p>
-    <ul class="items" id="listed"></ul>
-    <h2>Items you bought</h2>
-    <ul class="items" id="bought"></ul>
-  </main>
-  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
-  <script src="/js/require-login.js"></script>
-  <script src="/js/api.js"></script>
-  <script>
-    (async function () {
-      const err = document.getElementById("err");
-      try {
-        const data = await apiGet("/api/profile");
-        document.getElementById("who").textContent = data.user.username;
-        document.getElementById("uname").textContent = data.user.username;
+    <div style="flex: 1; max-width: 400px; margin: 0 2rem;"></div>
+    <nav>
+      <a href="/profile.html" style="border-bottom: 2px solid var(--primary); padding-bottom: 5px; color: var(--text-main);">Profile</a>
+      <span id="who" class="hi"></span>
+      <a href="#" id="logout" style="color: #9B1C1C;">Log Out</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" style="max-width: 800px; padding-top: 2rem;">
+  <h1 class="section-title mt-4" style="border: none; margin-top: 0;">Welcome, <span id="uname" style="color: var(--primary);"></span></h1>
+  <p id="err" class="err" hidden></p>
+  
+  <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;" id="pending-title" hidden>Pending Sales (Needs Confirmation)</h2>
+  <ul class="list-group" id="pending" style="margin-top: 1.5rem;" hidden></ul>
 
-        const listed = document.getElementById("listed");
-        if (!data.listed.length) {
-          listed.innerHTML = "<li class=\"small\">No listings.</li>";
-        } else {
-          data.listed.forEach(function (p) {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = "/product.html?id=" + p.id;
-            a.textContent = p.name;
-            li.appendChild(a);
-            li.appendChild(
-              document.createTextNode(" — " + (p.is_available ? "available" : "sold"))
-            );
-            listed.appendChild(li);
-          });
-        }
+  <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Active Listings</h2>
+  <ul class="list-group" id="listed" style="margin-top: 1.5rem;"></ul>
 
-        const bought = document.getElementById("bought");
-        if (!data.bought.length) {
-          bought.innerHTML = "<li class=\"small\">No purchases.</li>";
-        } else {
-          data.bought.forEach(function (p) {
-            const li = document.createElement("li");
-            const a = document.createElement("a");
-            a.href = "/product.html?id=" + p.id;
-            a.textContent = p.name;
-            li.appendChild(a);
-            li.appendChild(document.createTextNode(" — from " + p.seller_username));
-            bought.appendChild(li);
-          });
-        }
-      } catch (e) {
-        err.textContent = e.message || "Error";
-        err.hidden = false;
+  <h2 style="font-size: 1.15rem; font-weight: 700; margin-top: 3rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Items you bought</h2>
+  <ul class="list-group" id="bought" style="margin-top: 1.5rem;"></ul>
+</main>
+<footer style="margin-top: 4rem;">
+  <div>TradeLoop © 2026</div>
+  <div style="display: flex; gap: 1rem;">
+    <a href="#">Help</a>
+    <a href="#">Terms</a>
+    <a href="#">Safety</a>
+  </div>
+</footer>
+<script src="/js/require-login.js"></script>
+<script src="/js/api.js"></script>
+<script>
+  (async function () {
+    const err = document.getElementById("err");
+    try {
+      const data = await apiGet("/api/profile");
+      document.getElementById("who").textContent = data.user.username.charAt(0);
+      document.getElementById("uname").textContent = data.user.username;
+
+      const listed = document.getElementById("listed");
+      if (!data.listed.length) {
+        listed.innerHTML = "<p class=\"text-muted\">No listings yet.</p>";
+      } else {
+        data.listed.forEach(function (p) {
+          const li = document.createElement("li");
+          li.style.border = "1px solid var(--border-color)";
+          li.style.borderRadius = "var(--radius)";
+          
+          const titleDiv = document.createElement("div");
+          const a = document.createElement("a");
+          a.href = "/product.html?id=" + p.id;
+          a.textContent = p.name;
+          a.className = "list-title";
+          titleDiv.appendChild(a);
+          
+          const status = document.createElement("div");
+          status.className = "list-meta mt-2";
+          if (p.is_available) {
+            status.innerHTML = `<span class="badge bg-green" style="margin:0;">Available</span> <span style="margin-left:1rem; font-weight: 600; color: var(--text-main);">₹${p.price.toFixed(2)}</span>`;
+          } else {
+            status.innerHTML = `<span class="badge bg-red" style="margin:0;">Sold</span> <span style="margin-left:1rem; font-weight: 600; color: var(--text-main);">₹${p.price.toFixed(2)}</span>`;
+          }
+          
+          li.appendChild(titleDiv);
+          li.appendChild(status);
+          listed.appendChild(li);
+        });
       }
 
-      document.getElementById("logout").addEventListener("click", async function (e) {
-        e.preventDefault();
-        await apiPost("/api/logout", {});
-        window.location.href = "/login.html";
-      });
-    })();
-  </script>
+      const pending = document.getElementById("pending");
+      const pendingTitle = document.getElementById("pending-title");
+      if (data.pending && data.pending.length) {
+        pendingTitle.hidden = false;
+        pending.hidden = false;
+        data.pending.forEach(function (p) {
+          const li = document.createElement("li");
+          li.style.border = "1px solid var(--primary)";
+          li.style.borderRadius = "var(--radius)";
+          li.style.background = "#F0FDF4";
+          
+          const titleDiv = document.createElement("div");
+          const a = document.createElement("a");
+          a.href = "/product.html?id=" + p.id;
+          a.textContent = p.name;
+          a.className = "list-title";
+          titleDiv.appendChild(a);
+          
+          const status = document.createElement("div");
+          status.className = "list-meta mt-2";
+          status.innerHTML = `<span class="badge bg-yellow" style="margin:0;">Pending with ${p.buyer_username}</span>`;
+          
+          const confirmBtn = document.createElement("button");
+          confirmBtn.className = "btn mt-2";
+          confirmBtn.style.padding = "0.4rem 1rem";
+          confirmBtn.style.fontSize = "0.85rem";
+          confirmBtn.textContent = "Confirm Purchase Completed";
+          confirmBtn.addEventListener("click", async function() {
+            if (confirm("Is the purchase completely finished? This will remove the listing entirely.")) {
+              try {
+                await apiPost("/api/products/" + p.id + "/complete", {});
+                li.remove();
+                if(!pending.children.length) { pendingTitle.hidden = true; pending.hidden = true; }
+              } catch (ex) {
+                alert("Failed to confirm: " + ex.message);
+              }
+            }
+          });
+          status.appendChild(confirmBtn);
+
+          li.appendChild(titleDiv);
+          li.appendChild(status);
+          pending.appendChild(li);
+        });
+      }
+
+      const bought = document.getElementById("bought");
+      if (!data.bought.length) {
+        bought.innerHTML = "<p class=\"text-muted\">No purchases yet.</p>";
+      } else {
+        data.bought.forEach(function (p) {
+          const li = document.createElement("li");
+          li.style.border = "1px solid var(--border-color)";
+          li.style.borderRadius = "var(--radius)";
+          
+          const titleDiv = document.createElement("div");
+          const a = document.createElement("a");
+          a.href = "/product.html?id=" + p.id;
+          a.textContent = p.name;
+          a.className = "list-title";
+          titleDiv.appendChild(a);
+
+          const meta = document.createElement("div");
+          meta.className = "list-meta mt-2";
+          
+          const statusText = p.sold_at === null ? '<span class="badge bg-yellow">Pending Seller Update</span>' : '<span class="badge bg-green">Purchased</span>';
+          meta.innerHTML = `${statusText} Bought from <span style="font-weight:600; color:var(--text-main)">${p.seller_username}</span> for <strong style="color:var(--text-main)">₹${p.price.toFixed(2)}</strong>`;
+
+          li.appendChild(titleDiv);
+          li.appendChild(meta);
+          bought.appendChild(li);
+        });
+      }
+    } catch (e) {
+      err.textContent = e.message || "Error fetching profile";
+      err.hidden = false;
+    }
+
+    document.getElementById("logout").addEventListener("click", async function (e) {
+      e.preventDefault();
+      await apiPost("/api/logout", {});
+      window.location.href = "/login.html";
+    });
+  })();
+</script>
 </body>
 </html>

@@ -7,43 +7,54 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
-    <div class="wrap bar">
-      <a href="/" class="brand">TradeLoop</a>
+<header>
+  <div class="wrap navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a class="brand" href="/" style="display: flex; align-items: center;"><img src="/css/tradeloop-64px.svg" alt="TradeLoop" style="height: 32px;"></a>
     </div>
-  </header>
-  <main class="wrap">
-    <h1>Register</h1>
+  </div>
+</header>
+<main class="wrap-sm" style="padding-top: 4rem;">
+  <div class="auth-container">
+    <h1 class="auth-title">Register</h1>
     <p id="err" class="err" hidden></p>
-    <form id="form" class="form">
-      <label>Username <input name="username" required minlength="2" autocomplete="username"></label>
-      <label>Password <input name="password" type="password" required minlength="4" autocomplete="new-password"></label>
-      <button type="submit">Create account</button>
+    <form id="form">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" class="form-control" required minlength="2" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control" required minlength="4" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn mt-4">CREATE ACCOUNT</button>
     </form>
-    <p class="small"><a href="/login.html">Log in</a></p>
-  </main>
-  <footer class="wrap small">Prototype — Express + MySQL (SRS).</footer>
-  <script src="/js/api.js"></script>
-  <script>
-    fetch("/api/me", { credentials: "same-origin" }).then(function (r) {
-      if (r.ok) window.location.href = "/home.html";
-    });
-    document.getElementById("form").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const err = document.getElementById("err");
-      err.hidden = true;
-      const fd = new FormData(e.target);
-      try {
-        await apiPost("/api/register", {
-          username: fd.get("username"),
-          password: fd.get("password"),
-        });
-        window.location.href = "/home.html";
-      } catch (ex) {
-        err.textContent = ex.message || "Could not register";
-        err.hidden = false;
-      }
-    });
-  </script>
+    <p class="text-center mt-4 mb-2" style="font-size: 0.9rem;">
+      Already have an account? <a href="/login.html" style="font-weight: 600; color: var(--primary);">Log in</a>
+    </p>
+  </div>
+</main>
+<script src="/js/api.js"></script>
+<script>
+  fetch("/api/me", { credentials: "same-origin" }).then(function (r) {
+    if (r.ok) window.location.href = "/home.html";
+  });
+  document.getElementById("form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const err = document.getElementById("err");
+    err.hidden = true;
+    const fd = new FormData(e.target);
+    try {
+      await apiPost("/api/register", {
+        username: fd.get("username"),
+        password: fd.get("password"),
+      });
+      window.location.href = "/home.html";
+    } catch (ex) {
+      err.textContent = ex.message || "Could not register";
+      err.hidden = false;
+    }
+  });
+</script>
 </body>
 </html>

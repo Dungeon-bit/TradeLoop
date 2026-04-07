@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Help & Support — TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header>
+  <div class="wrap navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a class="brand" href="/" style="display: flex; align-items: center;"><img src="/css/tradeloop-64px.svg" alt="TradeLoop" style="height: 32px;"></a>
+      <nav>
+        <a href="/home.html">Shop</a>
+        <a href="/sell.html">Sell</a>
+        <a href="/help.html" style="border-bottom: 2px solid var(--primary); padding-bottom: 5px; color: var(--text-main);">Help</a>
+      </nav>
+    </div>
+    <div style="flex: 1; max-width: 400px; margin: 0 2rem;">
+      <input type="text" class="form-control" placeholder="Search..." id="nav-search" onkeydown="if(event.key==='Enter' && this.value.trim()!=='') window.location.href='/browse.html?q='+encodeURIComponent(this.value.trim());" style="border-radius: 9999px; background: #FAFAFA; border: 1px solid var(--border-color); font-size: 0.85rem; padding: 0.5rem 1rem;">
+    </div>
+    <nav>
+      <a href="/profile.html">Profile</a>
+      <span id="who" class="hi"></span>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" style="padding-top: 2rem; max-width: 600px; margin: 0 auto;">
+  <h1 class="section-title" id="title" style="border: none; padding: 0; text-align: center; margin-bottom: 2rem;">TradeLoop Customer Support</h1>
+  
+  <div style="background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 2rem; text-align: center;">
+    <p style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 1.5rem;">
+      Need help? We are here for you! Contact our customer care using the details below:
+    </p>
+
+    <div style="margin-bottom: 1.5rem;">
+      <div style="font-size: 0.9rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem;">Phone Support</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">
+        +91 9473618836
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size: 0.9rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem;">Email Support</div>
+      <div style="font-size: 1.25rem; font-weight: 600;">
+        <a href="mailto:support@help.in" style="color: var(--primary); text-decoration: none;">support@help.in</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer style="margin-top: 4rem;">
+  <div>TradeLoop © 2026</div>
+</footer>
+
+<script src="/js/require-login.js"></script>
+<script src="/js/api.js"></script>
+<script>
+  (async function () {
+    try {
+      const me = await apiGet("/api/me");
+      const who = document.getElementById("who");
+      if(who) {
+         who.textContent = me.user.username.charAt(0);
+      }
+    } catch (e) {
+      // Ignored if not logged in
+    }
+  })();
+</script>
+</body>
+</html>

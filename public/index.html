@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TradeLoop</title>
+  <link rel="stylesheet" href="/css/style.css">
   <script>
     fetch("/api/me", { credentials: "same-origin" }).then(function (r) {
       window.location.href = r.ok ? "/home.html" : "/login.html";
@@ -11,6 +12,8 @@
   </script>
 </head>
 <body>
-  <p>Loading…</p>
+  <div class="loader-container">
+    <img src="/css/tradeloop-64px.svg" height="80" alt="TradeLoop">
+  </div>
 </body>
 </html>

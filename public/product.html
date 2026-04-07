@@ -5,102 +5,148 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Product — TradeLoop</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-  <header>
-    <div class="wrap bar">
-      <a href="/home.html" class="brand">TradeLoop</a>
+<header>
+  <div class="wrap navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a class="brand" href="/" style="display: flex; align-items: center;"><img src="/css/tradeloop-64px.svg" alt="TradeLoop" style="height: 32px;"></a>
       <nav>
-        <a href="/home.html">Home</a>
+        <a href="/home.html">Shop</a>
         <a href="/sell.html">Sell</a>
-        <a href="/profile.html">Profile</a>
-        <span class="hi" id="who"></span>
-        <a href="#" id="logout">Log out</a>
+        <a href="/help.html">Help</a>
       </nav>
     </div>
-  </header>
-  <main class="wrap">
-    <h1 id="name">…</h1>
-    <p class="small" id="meta"></p>
-    <p><strong id="price"></strong></p>
-    <pre class="desc" id="desc"></pre>
-    <div id="actions"></div>
-    <p class="small"><a id="more" href="#">More in category</a></p>
-    <p id="err" class="err" hidden></p>
-  </main>
-  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
-  <script src="/js/require-login.js"></script>
-  <script src="/js/api.js"></script>
-  <script>
-    (async function () {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("id");
-      const err = document.getElementById("err");
-      if (!id) {
-        err.textContent = "Missing ?id=";
-        err.hidden = false;
-        return;
+    <div style="flex: 1; max-width: 400px; margin: 0 2rem;">
+      <input type="text" class="form-control" placeholder="Search..." id="nav-search" onkeydown="if(event.key==='Enter' && this.value.trim()!=='') window.location.href='/browse.html?q='+encodeURIComponent(this.value.trim());" style="border-radius: 9999px; background: #FAFAFA; border: 1px solid var(--border-color); font-size: 0.85rem; padding: 0.5rem 1rem;">
+    </div>
+    <nav>
+      <a href="/profile.html">Profile</a>
+      <span id="who" class="hi"></span>
+    </nav>
+  </div>
+</header>
+<main class="wrap" style="padding-top: 2rem;">
+  <p><a href="/home.html" style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">← Back to Shop</a></p>
+  <div class="product-layout">
+    <div class="product-image-container">
+      <img id="pimg" class="product-image" src="" alt="Product">
+    </div>
+    <div class="product-info">
+      <h1 id="name" style="margin-top: 0;">…</h1>
+      
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--text-main); font-size: 0.9rem; font-weight: 500;">
+        <div class="seller-avatar" style="width: 24px; height: 24px;"></div>
+        <span id="seller"></span>
+        <span class="seller-rating" style="margin-left: 0.5rem;">★ 4.8</span>
+      </div>
+
+      <div class="product-price" id="price"></div>
+      
+      <div id="actions" style="display: flex; flex-direction: column; gap: 10px; max-width: 300px; margin-bottom: 2rem;"></div>
+
+      <div class="product-desc" id="desc" style="border: none; padding: 0; background: transparent;"></div>
+      
+      <p class="mt-4"><a id="more" href="#" style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">More in category</a></p>
+      <p id="err" class="err" hidden></p>
+    </div>
+  </div>
+</main>
+<footer>
+  <div>TradeLoop © 2026</div>
+  <div style="display: flex; gap: 1rem;">
+    <a href="#">Help</a>
+    <a href="#">Terms</a>
+    <a href="#">Safety</a>
+  </div>
+</footer>
+<script src="/js/require-login.js"></script>
+<script src="/js/api.js"></script>
+<script>
+  (async function () {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const err = document.getElementById("err");
+    if (!id) {
+      err.textContent = "Missing ?id=";
+      err.hidden = false;
+      return;
+    }
+    let me;
+    try {
+      me = await apiGet("/api/me");
+      document.getElementById("who").textContent = me.user.username.charAt(0);
+    } catch (e) {
+      return;
+    }
+
+    try {
+      const { product: p } = await apiGet("/api/products/" + encodeURIComponent(id));
+      document.getElementById("pimg").src = p.image_url || 'https://dummyimage.com/800x600/EBEBEB/757575.jpg&text=No+Image';
+
+      document.getElementById("name").textContent = p.name;
+      document.getElementById("seller").textContent = p.seller_username || 'user' + p.id;
+      document.getElementById("price").textContent = "₹" + p.price.toFixed(2);
+      document.getElementById("desc").textContent = p.description || "No description provided by the seller.";
+      document.getElementById("more").href = "/browse.html?category=" + encodeURIComponent(p.category);
+
+      let locHtml = "";
+      if (p.address || p.phone_number) {
+        locHtml += `<div style="background: #FAFAFA; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; font-size: 0.95rem; border: 1px solid var(--border-color);">`;
+        if (p.phone_number) locHtml += `<div style="margin-bottom: 0.5rem"><strong>Phone:</strong> ${p.phone_number}</div>`;
+        if (p.address) locHtml += `<div><strong>Address:</strong> ${p.address}</div>`;
+        locHtml += `</div>`;
       }
-      let me;
-      try {
-        me = await apiGet("/api/me");
-        document.getElementById("who").textContent = me.user.username;
-      } catch (e) {
-        return;
+      if (p.lat && p.lng) {
+         locHtml += `<div id="displayMap" style="height: 250px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 2rem; z-index: 1;"></div>`;
+      }
+      document.getElementById("actions").insertAdjacentHTML('beforebegin', locHtml);
+
+      if (p.lat && p.lng) {
+        const map = L.map('displayMap').setView([p.lat, p.lng], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        L.marker([p.lat, p.lng]).addTo(map);
       }
 
-      try {
-        const { product: p } = await apiGet("/api/products/" + encodeURIComponent(id));
-        document.getElementById("name").textContent = p.name;
-        document.getElementById("meta").textContent =
-          p.category + " · Seller: " + p.seller_username;
-        document.getElementById("price").textContent = "₹" + p.price.toFixed(2);
-        document.getElementById("desc").textContent = p.description || "—";
-        document.getElementById("more").href =
-          "/browse.html?category=" + encodeURIComponent(p.category);
-        document.getElementById("more").textContent = "More in " + p.category;
-
-        const actions = document.getElementById("actions");
-        actions.innerHTML = "";
-        if (p.is_available) {
-          if (p.seller_id === me.user.id) {
-            actions.innerHTML = "<p class=\"small\">Your listing.</p>";
-          } else {
-            const form = document.createElement("form");
-            const btn = document.createElement("button");
-            btn.type = "submit";
-            btn.textContent = "Buy";
-            form.appendChild(btn);
-            form.addEventListener("submit", async function (ev) {
-              ev.preventDefault();
-              err.hidden = true;
-              try {
-                await apiPost("/api/products/" + id + "/buy", {});
-                window.location.href = "/profile.html";
-              } catch (ex) {
-                err.textContent = ex.message || "Error";
-                err.hidden = false;
-              }
-            });
-            actions.appendChild(form);
-          }
+      const actions = document.getElementById("actions");
+      actions.innerHTML = "";
+      if (p.is_available) {
+        if (p.seller_id === me.user.id) {
+          actions.innerHTML = "<p class=\"text-muted\" style=\"font-weight: 600;\">This is your listing.</p>";
         } else {
-          actions.innerHTML =
-            "<p class=\"small\">Sold" +
-            (p.buyer_username ? " to " + p.buyer_username : "") +
-            ".</p>";
-        }
-      } catch (e) {
-        err.textContent = e.message || "Not found";
-        err.hidden = false;
-      }
+          const form = document.createElement("form");
+          const btn = document.createElement("button");
+          btn.type = "submit";
+          btn.className = "btn";
+          btn.textContent = "BUY NOW";
+          form.appendChild(btn);
 
-      document.getElementById("logout").addEventListener("click", async function (e) {
-        e.preventDefault();
-        await apiPost("/api/logout", {});
-        window.location.href = "/login.html";
-      });
-    })();
-  </script>
+          form.addEventListener("submit", async function (ev) {
+            ev.preventDefault();
+            err.hidden = true;
+            try {
+              await apiPost("/api/products/" + id + "/buy", {});
+              window.location.href = "/profile.html";
+            } catch (ex) {
+              err.textContent = ex.message || "Error";
+              err.hidden = false;
+            }
+          });
+          actions.appendChild(form);
+        }
+      } else {
+        actions.innerHTML =
+          "<div class=\"badge bg-red\" style=\"font-size: 0.9rem; padding: 0.5rem 1rem;\">" +
+          "<strong>Sold</strong>" +
+          "</div>";
+      }
+    } catch (e) {
+      err.textContent = e.message || "Not found";
+      err.hidden = false;
+    }
+  })();
+</script>
 </body>
 </html>

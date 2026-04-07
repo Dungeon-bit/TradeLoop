@@ -7,70 +7,120 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
-    <div class="wrap bar">
-      <a href="/home.html" class="brand">TradeLoop</a>
+<header>
+  <div class="wrap navbar">
+    <div style="display: flex; align-items: center; gap: 2rem;">
+      <a class="brand" href="/" style="display: flex; align-items: center;"><img src="/css/tradeloop-64px.svg" alt="TradeLoop" style="height: 32px;"></a>
       <nav>
-        <a href="/home.html">Home</a>
+        <a href="/home.html" style="border-bottom: 2px solid var(--primary); padding-bottom: 5px; color: var(--text-main);">Shop</a>
         <a href="/sell.html">Sell</a>
-        <a href="/profile.html">Profile</a>
-        <span class="hi" id="who"></span>
-        <a href="#" id="logout">Log out</a>
+        <a href="/help.html">Help</a>
       </nav>
     </div>
-  </header>
-  <main class="wrap">
-    <h1 id="title">Browse</h1>
-    <p class="small"><a href="/home.html">← Home</a></p>
-    <p id="err" class="err" hidden></p>
-    <ul class="items" id="list"></ul>
-  </main>
-  <footer class="wrap small">No online payments — arrange offline (SRS).</footer>
-  <script src="/js/require-login.js"></script>
-  <script src="/js/api.js"></script>
-  <script>
-    (async function () {
-      const params = new URLSearchParams(window.location.search);
-      const category = params.get("category");
-      const err = document.getElementById("err");
-      if (!category) {
-        err.textContent = "Missing ?category=";
-        err.hidden = false;
+    
+    <div style="flex: 1; max-width: 400px; margin: 0 2rem;">
+      <input type="text" class="form-control" placeholder="Search for vintage denim, tech, home..." id="nav-search" onkeydown="if(event.key==='Enter' && this.value.trim()!=='') window.location.href='/browse.html?q='+encodeURIComponent(this.value.trim());" style="border-radius: 9999px; background: #FAFAFA; border: 1px solid var(--border-color); font-size: 0.85rem; padding: 0.5rem 1rem;">
+    </div>
+
+    <nav>
+      <a href="/profile.html">Profile</a>
+      <span id="who" class="hi"></span>
+    </nav>
+  </div>
+</header>
+<main>
+  <div class="wrap" style="padding-top: 2rem;">
+    <p><a href="/home.html" style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">← Back to Shop</a></p>
+    <h1 class="section-title" id="title" style="margin-top: 1rem; border: none; padding: 0;">Browse Category</h1>
+    
+    <div style="margin-top: 2rem;">
+      <p id="err" class="err" hidden></p>
+      <div id="list" class="grid"></div>
+    </div>
+  </div>
+</main>
+<footer>
+  <div>TradeLoop © 2026</div>
+</footer>
+<script src="/js/require-login.js"></script>
+<script src="/js/api.js"></script>
+<script>
+  (async function () {
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
+    const q = params.get("q");
+    const err = document.getElementById("err");
+    if (!category && !q) {
+      err.textContent = "Please specify a category or search term.";
+      err.hidden = false;
+      return;
+    }
+
+    try {
+      const me = await apiGet("/api/me");
+      document.getElementById("who").textContent = me.user.username.charAt(0);
+      document.getElementById("title").textContent = q ? 'Search: "' + q + '"' : category;
+
+      let products;
+      if (q) {
+        const res = await apiGet("/api/products/search?q=" + encodeURIComponent(q));
+        products = res.products;
+      } else {
+        const res = await apiGet("/api/products/by-category/" + encodeURIComponent(category));
+        products = res.products;
+      }
+      const list = document.getElementById("list");
+      if (!products.length) {
+        list.innerHTML = "<p>No items found in this category.</p>";
+        list.className = "";
         return;
       }
-      try {
-        const me = await apiGet("/api/me");
-        document.getElementById("who").textContent = me.user.username;
-        document.getElementById("title").textContent = category;
+      products.forEach(function (p) {
+        const div = document.createElement("div");
+        div.className = "card";
+        const imgSrc = p.image_url || 'https://dummyimage.com/400x300/EBEBEB/757575.jpg&text=No+Image';
 
-        const { products } = await apiGet("/api/products/by-category/" + encodeURIComponent(category));
-        const list = document.getElementById("list");
-        if (!products.length) {
-          list.innerHTML = "<li class=\"small\">No items in this category.</li>";
-          return;
-        }
-        products.forEach(function (p) {
-          const li = document.createElement("li");
-          const a = document.createElement("a");
-          a.href = "/product.html?id=" + p.id;
-          a.textContent = p.name;
-          li.appendChild(a);
-          li.appendChild(
-            document.createTextNode(" — ₹" + p.price.toFixed(2) + " — " + p.seller_username)
-          );
-          list.appendChild(li);
-        });
-      } catch (e) {
-        err.textContent = e.message || "Error";
-        err.hidden = false;
-      }
-
-      document.getElementById("logout").addEventListener("click", async function (e) {
-        e.preventDefault();
-        await apiPost("/api/logout", {});
-        window.location.href = "/login.html";
+        div.innerHTML = `
+          <div class="card-img-wrapper" style="cursor: pointer;" onclick="window.location.href='/product.html?id=${p.id}'">
+            <img class="card-img" src="${imgSrc}" alt="${p.name}">
+          </div>
+          <div class="card-body">
+            <h3 class="card-title" style="margin-top: 0.5rem;"><a href="/product.html?id=${p.id}" style="color: inherit; text-decoration: none;">${p.name}</a></h3>
+            <div class="card-price">₹${p.price.toFixed(2)}</div>
+            <div class="seller-info">
+              <div class="seller-avatar"></div>
+              <span style="font-weight: 500;">${p.seller_username}</span>
+            </div>
+            <button type="button" class="btn mt-3 buy-btn" data-id="${p.id}">BUY NOW</button>
+          </div>
+        `;
+        list.appendChild(div);
       });
-    })();
-  </script>
+
+      // Add listener for instant buy
+      list.addEventListener("click", async function(e) {
+        if (e.target.classList.contains("buy-btn")) {
+          const btn = e.target;
+          const pid = btn.getAttribute("data-id");
+          btn.disabled = true;
+          btn.textContent = "Processing...";
+          err.hidden = true;
+          try {
+            await apiPost("/api/products/" + pid + "/buy", {});
+            window.location.href = "/profile.html";
+          } catch (ex) {
+            err.textContent = ex.message || "Failed to buy";
+            err.hidden = false;
+            btn.disabled = false;
+            btn.textContent = "BUY NOW";
+          }
+        }
+      });
+    } catch (e) {
+      err.textContent = e.message || "Error";
+      err.hidden = false;
+    }
+  })();
+</script>
 </body>
 </html>
