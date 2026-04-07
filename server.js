@@ -15,7 +15,11 @@ if (!fs.existsSync(path.join(__dirname, "public", "uploads"))) {
 }
 const upload = multer({ dest: path.join(__dirname, "public", "uploads") });
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on", PORT);
+});
 const CATEGORIES = ["Books", "Electronics", "Essentials", "Others"];
 
 const pool = mysql.createPool({
