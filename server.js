@@ -27,8 +27,9 @@ const pool = mysql.createPool({
   ssl: {
     rejectUnauthorized: false
   },
-  waitForConnections: true,
-  connectionLimit: 10,
+  connectTimeout: 10000,
+  enableKeepAlive: true,
+  family: 4
 });
 
 const app = express();
