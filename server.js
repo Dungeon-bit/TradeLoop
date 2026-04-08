@@ -30,8 +30,7 @@ const pool = mysql.createPool({
     rejectUnauthorized: false
   },
   connectTimeout: 10000,
-  enableKeepAlive: true,
-  family: 4
+  enableKeepAlive: true
 });
 
 app.use(express.json());
@@ -376,6 +375,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log("Server running on", PORT);
 });

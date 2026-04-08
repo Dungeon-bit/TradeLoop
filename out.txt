@@ -1,0 +1,3 @@
+Ignoring invalid configuration option passed to Connection: family. This is currently a warning, but in future versions of MySQL2, an error will be thrown if you pass an invalid configuration option to a Connection
+127.0.0.1 3306
+Server running on 3000
