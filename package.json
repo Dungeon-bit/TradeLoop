@@ -2,7 +2,7 @@
   "name": "tradeloop",
   "version": "1.0.0",
   "private": true,
-  "description": "SRS prototype: HTML/CSS/JS + Express + MySQL",
+  "description": "Second Hand MarketPlace",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
